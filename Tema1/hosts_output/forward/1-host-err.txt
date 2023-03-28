@@ -61,12 +61,12 @@
      ihl       = 5
      tos       = 0xc0
      len       = 48
-     id        = 12321
+     id        = 49676
      flags     = 
      frag      = 0
      ttl       = 64
      proto     = icmp
-     chksum    = 0xc797
+     chksum    = 0x35ac
      src       = 192.168.1.2
      dst       = 192.168.0.2
      \options   \

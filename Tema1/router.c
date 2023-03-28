@@ -62,41 +62,63 @@ int main(int argc, char *argv[]) {
 
 		struct ether_header *eth_hdr = (struct ether_header*) buf;
 		struct iphdr *ip_hdr = (struct iphdr*)(buf + sizeof(struct ether_header));
-        struct icmphdr *icmp_hdr = (struct icmphdr*)(buf + sizeof(struct ether_header) + sizeof(struct iphdr));
-		
-        
+        struct icmphdr *icmp_hdr = (struct icmphdr*)(buf + sizeof(struct ether_header) + sizeof(struct icmphdr));
+
 		if (checksum((void*)ip_hdr, sizeof(struct iphdr)))
             continue;
-        
-        struct route_table_entry* best_route = get_best_route(ip_hdr->daddr);
 
-        if (ip_hdr->ttl <= 1) {
+        ip_hdr->check = ~(~ip_hdr->check - 1);
+ 
+        ip_hdr->ttl--;
+        if (ip_hdr->ttl <= 0) {
+            void *aux = malloc(len);
+            memcpy(aux, buf, len);
+
+            struct ether_header *eth_hdr_aux = (struct ether_header*) aux;
+            struct iphdr *ip_hdr_aux = (struct iphdr*)(aux + sizeof(struct ether_header));
+            // struct icmphdr *icmp_hdr_aux = (struct icmphdr*)(aux + sizeof(struct ether_header) + sizeof(struct iphdr));
+
+            memcpy(eth_hdr->ether_dhost, eth_hdr_aux->ether_shost, 6);
+            memcpy(eth_hdr->ether_shost, eth_hdr_aux->ether_dhost, 6);
+            eth_hdr->ether_type = 0x800;
+
+            ip_hdr->daddr = ip_hdr_aux->saddr;
+            // ip_hdr->saddr = *(int*)get_interface_ip(interface);
+
+
+            printf("%s\n", get_interface_ip(interface));
+            printf("%d\n", ip_hdr->daddr = ip_hdr_aux->saddr);
+            ip_hdr->check = 0;
+            ip_hdr->protocol = 1;
+            ip_hdr->ttl = 64;
+
             icmp_hdr->type = 11;
             icmp_hdr->code = 0;
-            ip_hdr->daddr = ip_hdr->saddr;
-            best_route = get_best_route(ip_hdr->daddr);
-            // ip_hdr->protocol = 1;
+            icmp_hdr->checksum = 0;
+
+            int offset = sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct icmphdr);
+            memcpy(buf + offset, ip_hdr_aux, sizeof(struct iphdr) + 8);
+
+            len = sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct icmphdr) + sizeof(struct iphdr) + 8;
+            send_to_link(interface, buf, len);
             continue;
         }
 
+        struct route_table_entry* best_route = get_best_route(ip_hdr->daddr);
         if (best_route == NULL) {
-            icmp_hdr->type = 3;
-            icmp_hdr->code = 0;
-            ip_hdr->daddr = ip_hdr->saddr;
-            best_route = get_best_route(ip_hdr->daddr);
-            // ip_hdr->protocol = 1;
             continue;
         }
 
-        ip_hdr->ttl--;
-        ip_hdr->check = ~(~ip_hdr->check - 1);
+        printf("ia sa vdm %d\n", ip_hdr->daddr);
 
+        interface = best_route->interface;
         memcpy(eth_hdr->ether_dhost, get_mac_entry(best_route->next_hop)->mac, sizeof(uint8_t) * 6);
-        get_interface_mac(best_route->interface, eth_hdr->ether_shost);
+        get_interface_mac(interface, eth_hdr->ether_shost);
 
-        send_to_link(best_route->interface, buf, len);
+        printf("%ld\n", len);
+
+        send_to_link(interface, buf, len);
 	}
 
 	return 0;
 }
-

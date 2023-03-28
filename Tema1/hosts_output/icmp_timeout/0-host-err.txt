@@ -1,10 +1,35 @@
-Traceback (most recent call last):
-  File "/home/robert/Desktop/Materiale cursuri/ANUL 2/Semestrul 2/PCom/Communication-Protocols/Tema1/./checker/checker.py", line 77, in <module>
-    main()
-  File "/home/robert/Desktop/Materiale cursuri/ANUL 2/Semestrul 2/PCom/Communication-Protocols/Tema1/./checker/checker.py", line 71, in main
-    passive(args.host, args.testname)
-  File "/home/robert/Desktop/Materiale cursuri/ANUL 2/Semestrul 2/PCom/Communication-Protocols/Tema1/./checker/checker.py", line 38, in passive
-    status = fn(testname, packets)
-  File "/home/robert/Desktop/Materiale cursuri/ANUL 2/Semestrul 2/PCom/Communication-Protocols/Tema1/checker/tests.py", line 415, in icmp_timeout_p
-    if ICMP not in packets[1]:
-IndexError: list index out of range
+-- No ICMP packet from router
+-- Packet
+###[ Ethernet ]### 
+  dst       = de:fe:c8:ed:00:00
+  src       = de:ad:be:ef:00:00
+  type      = IPv4
+###[ IP ]### 
+     version   = 4
+     ihl       = 5
+     tos       = 0x0
+     len       = 20
+     id        = 1
+     flags     = 
+     frag      = 0
+     ttl       = 1
+     proto     = hopopt
+     chksum    = 0x3895
+     src       = 192.168.0.2
+     dst       = 192.168.0.2
+     \options   \
+
+-- Packet
+###[ 802.3 ]### 
+  dst       = de:ad:be:ef:00:00
+  src       = de:fe:c8:ed:00:00
+  len       = 8
+###[ LLC ]### 
+     dsap      = 0x45
+     ssap      = 0x0
+     ctrl      = 0
+###[ Raw ]### 
+        load      = '\x14\x00\x01\x00\x00'
+###[ Padding ]### 
+           load      = '\x0b\x00\x00\x00192.\xc0\xa8\x00\x02\x08\x00\xf7\xff\x00\x00\x00\x00E\x00\x00\x14\x00\x01\x00\x00\x00\x009\x95\xc0\xa8\x00\x02\xc0\xa8\x00\x02168.1.a\xe9'
+
