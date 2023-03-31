@@ -91,11 +91,11 @@ int main(int argc, char *argv[]) {
 	rtable = malloc(sizeof(struct route_table_entry) * 100000);
     DIE(rtable == NULL, "memory");
 
-    mac_table = malloc(sizeof(struct arp_entry) * 100000);
+    mac_table = malloc(sizeof(struct arp_entry) * 100);
     DIE(mac_table == NULL, "memory");
 
     rtable_len = read_rtable(argv[1], rtable);
-    mac_table_len = parse_arp_table("arp_table.txt", mac_table);
+    mac_table_len = parse_arp_table("t.txt", mac_table);
 
 	while (1) {
 		int interface;
@@ -107,6 +107,38 @@ int main(int argc, char *argv[]) {
 		struct ether_header *eth_hdr = (struct ether_header*) buf;
 		struct iphdr *ip_hdr = (struct iphdr*)(buf + sizeof(struct ether_header));
         struct icmphdr *icmp_hdr = (struct icmphdr*)(buf + sizeof(struct ether_header) + sizeof(struct iphdr));
+
+
+        // if (eth_hdr->ether_type == htons(0x0806)) {
+        //     int32_t ip_interface = inet_addr(get_interface_ip(interface));
+        //     struct arp_header *arp_hdr = (struct arp_header*)(buf + sizeof(struct ether_header));
+
+        //     void *aux = malloc(len);
+        //     memcpy(aux, buf, len);
+        //     struct arp_header *arp_hdr_aux = (struct arp_header*)(aux + sizeof(struct ether_header));
+
+        //     if (htons(arp_hdr->op) == 1) {
+        //         printf("%d %d\n", ip_interface, arp_hdr->tpa);
+        //         if (ip_interface != arp_hdr->tpa) {
+        //             continue;
+        //         }
+
+        //         arp_hdr->op = htons(2);
+
+        //         get_interface_mac(interface, arp_hdr->sha);
+        //         memcpy(arp_hdr->tha, arp_hdr_aux->sha, 6);
+
+        //         memcpy(eth_hdr->ether_shost, arp_hdr->sha, 6);
+        //         memcpy(eth_hdr->ether_dhost, arp_hdr->tha, 6);
+
+        //         arp_hdr->spa = arp_hdr_aux->tpa;
+        //         arp_hdr->spa = arp_hdr_aux->spa;
+
+        //         send_to_link(interface, buf, len);
+        //         free(aux);
+        //         continue;
+        //     }
+        // }
 
 		if (checksum((void*)ip_hdr, sizeof(struct iphdr)))
             continue;
@@ -136,6 +168,8 @@ int main(int argc, char *argv[]) {
                 continue;
             }
         }
+
+
 
         interface = best_route->interface;
         memcpy(eth_hdr->ether_dhost, get_mac_entry(best_route->next_hop)->mac, sizeof(uint8_t) * 6);

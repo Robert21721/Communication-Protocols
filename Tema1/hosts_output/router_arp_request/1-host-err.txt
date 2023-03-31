@@ -1,0 +1,4 @@
+  File "/home/robert/Desktop/Materiale cursuri/ANUL 2/Semestrul 2/PCom/Communication-Protocols/Tema1/./checker/checker.py", line 38, in passive
+    status = fn(testname, packets)
+  File "/home/robert/Desktop/Materiale cursuri/ANUL 2/Semestrul 2/PCom/Communication-Protocols/Tema1/checker/tests.py", line 246, in router_arp_request_p
+    assert ARP in packets[0], "No ARP request!"
