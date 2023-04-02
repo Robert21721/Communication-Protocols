@@ -1,1 +1,2 @@
-router0: lib/queue.c:36: queue_deq: Assertion `!queue_empty(q)' failed.
+[(lib/lib.c:91)]: "receive_from_link"
+Network is down

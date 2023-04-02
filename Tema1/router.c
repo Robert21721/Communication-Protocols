@@ -35,6 +35,19 @@ struct arp_entry *get_mac_entry(uint32_t ip_dest, struct arp_entry *mac_table, i
     return NULL;
 }
 
+void print_ip(char *msg, unsigned int ip) {
+    unsigned char bytes[4];
+    bytes[0] = ip & 0xFF;
+    bytes[1] = (ip >> 8) & 0xFF;
+    bytes[2] = (ip >> 16) & 0xFF;
+    bytes[3] = (ip >> 24) & 0xFF;   
+    printf("%s: %d.%d.%d.%d\n",msg, bytes[3], bytes[2], bytes[1], bytes[0]);        
+}
+
+void print_mac(char *msg, uint8_t *mac) {
+        printf("%s: %x.%x.%x.%x.%x.%x\n", msg, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 
 
 void create_icmp(void *buf, size_t *len, int type, int code) {
@@ -49,12 +62,21 @@ void create_icmp(void *buf, size_t *len, int type, int code) {
     struct iphdr *ip_hdr_aux = (struct iphdr*)(aux + sizeof(struct ether_header));
     struct icmphdr *icmp_hdr_aux = (struct icmphdr*)(aux + sizeof(struct ether_header) + sizeof(struct iphdr));
 
+    // printf("create icmp\n");
+
     memcpy(eth_hdr->ether_dhost, eth_hdr_aux->ether_shost, 6);
     memcpy(eth_hdr->ether_shost, eth_hdr_aux->ether_dhost, 6);
     eth_hdr->ether_type = htons(0x800);
 
     ip_hdr->daddr = ip_hdr_aux->saddr;
     ip_hdr->saddr = ip_hdr_aux->daddr;
+
+
+    // print_ip("ip saddr", ip_hdr->saddr);
+    // print_ip("ip daddr", ip_hdr->daddr);
+
+    // print_mac("mac shost", eth_hdr->ether_shost);
+    // print_mac("mac dhost", eth_hdr->ether_dhost);
 
     ip_hdr->version = 4;
     ip_hdr->ihl = 5;
@@ -91,6 +113,7 @@ void create_arp_req(void *buf, size_t *len, uint32_t dest_ip, int interface) {
     struct ether_header *eth_hdr_aux = (struct ether_header*) aux;
     //struct arp_header *arp_hdr_aux = (struct arp_header*)(aux + sizeof(struct ether_header));
 
+    // printf("create arp req\n");
     uint32_t source_ip = inet_addr(get_interface_ip(interface));
 
     memcpy(eth_hdr->ether_shost, eth_hdr_aux->ether_dhost, 6);
@@ -108,6 +131,12 @@ void create_arp_req(void *buf, size_t *len, uint32_t dest_ip, int interface) {
 
     memset(arp_hdr->tha, 0, 6);
     arp_hdr->tpa = dest_ip;
+
+    // print_ip("ip src", arp_hdr->spa);
+    // print_ip("ip dest", arp_hdr->tpa);
+
+    // print_mac("mac src", arp_hdr->sha);
+    // print_mac("mac dest", arp_hdr->tha);
 
     *len = sizeof(struct ether_header) + sizeof(struct arp_header);
     free(aux);
@@ -136,12 +165,15 @@ int main(int argc, char *argv[]) {
 		size_t len;
 
 		interface = recv_from_any_link(buf, &len);
+
 		DIE(interface < 0, "recv_from_any_links");
+        // printf("message recieved from interface %d\n", interface);
 
         struct ether_header *eth_hdr = (struct ether_header*) buf;
 
         if (eth_hdr->ether_type == htons(0x800)) {
             // struct ether_header *eth_hdr = (struct ether_header*) buf;
+            // printf("ip / icmp\n");
             struct iphdr *ip_hdr = (struct iphdr*)(buf + sizeof(struct ether_header));
             struct icmphdr *icmp_hdr = (struct icmphdr*)(buf + sizeof(struct ether_header) + sizeof(struct iphdr));
 
@@ -170,19 +202,22 @@ int main(int argc, char *argv[]) {
                 if (icmp_hdr->type == 8 && icmp_hdr->code == 0 && ip_hdr->daddr == ip_interface) {
                     create_icmp(buf, &len, 0, 0);
                     send_to_link(interface, buf, len);
+                    continue;
                 }
-                continue;
             }
 
             interface = best_route->interface;
+            // printf("interfat pe care trimitem este %d\n", interface);
             get_interface_mac(interface, eth_hdr->ether_shost);
             struct arp_entry *mac_dest = get_mac_entry(best_route->next_hop, mac_table, mac_table_len);
 
             if (mac_dest != NULL) {
-                memcpy(eth_hdr->ether_dhost, mac_dest, 6);
+                // printf("avem mac in tabela\n");
+                memcpy(eth_hdr->ether_dhost, mac_dest->mac, 6);
                 send_to_link(interface, buf, len);
             } else {
                 
+                // printf("nu avem mac in tabela\n");
                 struct ip_pack *pack = (struct ip_pack*) malloc(sizeof(struct ip_pack));
                 pack->buf = malloc(1000);
                 memcpy(pack->buf, buf, len);
@@ -190,13 +225,14 @@ int main(int argc, char *argv[]) {
                 pack->len = len;
                 pack->interface = interface;
 
+                // printf("arp trimis\n");
                 queue_enq(queue, (void*)pack);
                 create_arp_req(buf, &len, best_route->next_hop, interface);
                 send_to_link(interface, buf, len);
             }
 
         } else if (eth_hdr->ether_type == htons(0x806)) {
-
+            // printf("am primit un arp\n");
             int32_t ip_interface = inet_addr(get_interface_ip(interface));
             struct arp_header *arp_hdr = (struct arp_header*)(buf + sizeof(struct ether_header));
 
@@ -205,11 +241,12 @@ int main(int argc, char *argv[]) {
             struct arp_header *arp_hdr_aux = (struct arp_header*)(aux + sizeof(struct ether_header));
 
             if (htons(arp_hdr->op) == 1) {
-                // printf("%d %d\n", ip_interface, arp_hdr->tpa);
+                // printf("am primit arp req\n");
                 if (ip_interface != arp_hdr->tpa) {
                     continue;
                 }
-
+                
+                // printf("si e pentru noi\n");
                 arp_hdr->op = htons(2);
 
                 get_interface_mac(interface, arp_hdr->sha);
@@ -221,38 +258,45 @@ int main(int argc, char *argv[]) {
                 arp_hdr->spa = arp_hdr_aux->tpa;
                 arp_hdr->tpa = arp_hdr_aux->spa;
 
+                // print_ip("arp s_ip", arp_hdr->spa);
+                // print_ip("arp d_ip", arp_hdr->tpa);
+
+                // print_mac("arp s mac", arp_hdr->sha);
+                // print_mac("arp d mac", arp_hdr->tha);
+
                 send_to_link(interface, buf, len);
                 free(aux);
                 // continue;
 
             } else if (htons(arp_hdr->op) == 2) {
+                // printf("arp rsponse\n");
                 memcpy(mac_table[mac_table_len].mac, arp_hdr->sha, 6);
                 mac_table[mac_table_len].ip = arp_hdr->spa;
                 mac_table_len++;
- 
+
                 struct queue *new_q = queue_create();
 
-                // while (!queue_empty(queue)) {
+                while (!queue_empty(queue)) {
                     struct ip_pack *pack = (struct ip_pack*)queue_deq(queue);
+                    struct ether_header *pack_eth = (struct ether_header*)(pack->buf);
+   
+                    int ok = 0;
+                    for (int i = 0; i < mac_table_len; i++) {
+                        if (pack->next_ip == mac_table[i].ip) {
+                            memcpy(pack_eth->ether_dhost, mac_table[i].mac, 6);
+                            ok = 1;
+                            break;
+                        }
+                    }
 
-                //     if (inet_addr(get_interface_ip(pack->interface)) == arp_hdr->tpa) {
-                        struct ether_header *pack_eth = (struct ether_header*)(pack->buf);
-                        struct iphdr* pack_ip = (struct iphdr*) (pack->buf + sizeof(struct ether_header));
+                    if (ok) {
+                        send_to_link(pack->interface, pack->buf, pack->len); 
+                    } else {
+                        queue_enq(new_q, (void*)pack);
+                    } 
+                }
 
-                        printf("ajungem si noi?\n");
-                        pack_ip->saddr = arp_hdr->tpa;
-                        memcpy(pack_eth->ether_dhost, arp_hdr->sha, 6);
-                        send_to_link(pack->interface, pack->buf, pack->len);
-
-                      //  printf("%d %d\n", inet_addr(get_interface_ip(pack->interface), pack_arp_hdr->tpa);
-                       
-                        
-                //     } else {
-                //         queue_enq(new_q, (void*)pack);
-                //     } 
-                // }
-
-                // queue = new_q;
+                queue = new_q;
             }
         }
     }
