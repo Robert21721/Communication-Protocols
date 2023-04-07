@@ -5,36 +5,6 @@
 #include <arpa/inet.h>
 #include "list.h"
 
-struct ip_pack {
-    void *buf;
-    uint32_t next_ip;
-    int len;
-    int interface;
-};
-
-struct route_table_entry *get_best_route(uint32_t ip_dest, struct route_table_entry *rtable, int rtable_len) {
-	int max = 0;
-	struct route_table_entry* ret = NULL;
-
-    for (int i = 0; i < rtable_len; i++) {
-        if (rtable[i].prefix == (ip_dest & rtable[i].mask)) {
-            if (rtable[i].mask > max) {
-				max = rtable[i].mask;
-				ret = &rtable[i];
-			}
-        }
-    }
-    return ret;
-}
-
-struct arp_entry *get_mac_entry(uint32_t ip_dest, struct arp_entry *mac_table, int mac_table_len) {
-    for (int i = 0; i < mac_table_len; i++) {
-        if (mac_table[i].ip == ip_dest)
-            return &mac_table[i];
-    }
-    return NULL;
-}
-
 void print_ip(char *msg, unsigned int ip) {
     unsigned char bytes[4];
     bytes[0] = ip & 0xFF;
@@ -46,6 +16,147 @@ void print_ip(char *msg, unsigned int ip) {
 
 void print_mac(char *msg, uint8_t *mac) {
         printf("%s: %x.%x.%x.%x.%x.%x\n", msg, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
+
+struct ip_pack {
+    void *buf;
+    uint32_t next_ip;
+    int len;
+    int interface;
+};
+
+struct node {
+    struct node *p;
+    struct node *l;
+    struct node *r;
+    struct route_table_entry *entry;
+};
+
+struct node* create_node() {
+    struct node *n = (struct node*)malloc(sizeof(struct node));
+
+    n->p = NULL;
+    n->l = NULL;
+    n->r = NULL;
+    n->entry = NULL;
+
+    return n;
+}
+
+int get_ip_len(uint32_t ip) {
+    int len = 0;
+
+    while (ip != 0) {
+        ip = ip << 1;
+        len++;
+    }
+
+    return len;
+}
+
+
+void add_router_in_tree(struct route_table_entry *e, struct node *t) {
+    int mask_len = get_ip_len(htonl(e->mask));
+    int prefix_len = get_ip_len(htonl(e->prefix));
+
+    if (prefix_len > mask_len) {
+        return;
+    }
+
+    struct node *iter = t;
+    for (int i = 0; i < mask_len; i++) {
+        int m = 1 << (31 - i);
+        int dir = (htonl(e->prefix) & m);
+ 
+        if (dir == 0) {
+            // printf("stanga\n");
+            if (iter->l != NULL) {
+                iter = iter->l;
+            } else {
+                // printf("adaug nod st\n");
+                struct node *new_node = create_node();
+                new_node->p = iter;
+                iter->l = new_node;
+                iter = new_node;
+            }
+        } else {
+            if (iter->r != NULL) {
+                iter = iter->r;
+            } else {
+                // printf("adaug nod dr\n");
+                struct node *new_node = create_node();
+                new_node->p = iter;
+                iter->r = new_node;
+                iter = new_node;
+            }
+        }
+
+    }
+
+    iter->entry = e;
+}
+
+struct node *create_tree(struct route_table_entry *rtable, int rtable_len) {
+    struct node *tree = create_node();
+
+    for (int i = 0; i < rtable_len; i++) {
+        add_router_in_tree(&rtable[i], tree);
+    }
+
+    return tree;
+}
+
+struct route_table_entry *get_best_route(uint32_t ip_dest, struct node *t) {
+    struct node *iter = t;
+
+	for (int i = 0; i < 32; i++) {
+        int m = 1 << (31 - i);
+        int dir = (htonl(ip_dest) & m) >> (31 - i);
+
+        if (dir == 0) {
+            if (iter->l != NULL) {
+                // printf("0\n");
+                iter = iter->l;
+            } else {
+                break;
+            }
+        } else {
+            if (iter->r != NULL) {
+                // printf("1\n");
+                iter = iter->r;
+            } else {
+                break;
+            }
+        }
+
+        // printf("\n");
+    }
+
+    return iter->entry;
+}
+
+// struct route_table_entry *get_best_route(uint32_t ip_dest, struct route_table_entry *rtable, int rtable_len) {
+// 	int max = 0;
+// 	struct route_table_entry* ret = NULL;
+
+//     for (int i = 0; i < rtable_len; i++) {
+//         if (rtable[i].prefix == (ip_dest & rtable[i].mask)) {
+//             if (rtable[i].mask > max) {
+// 				max = rtable[i].mask;
+// 				ret = &rtable[i];
+// 			}
+//         }
+//     }
+//     return ret;
+// }
+
+struct arp_entry *get_mac_entry(uint32_t ip_dest, struct arp_entry *mac_table, int mac_table_len) {
+    for (int i = 0; i < mac_table_len; i++) {
+        if (mac_table[i].ip == ip_dest)
+            return &mac_table[i];
+    }
+    return NULL;
 }
 
 
@@ -149,16 +260,16 @@ int main(int argc, char *argv[]) {
 
     struct route_table_entry *rtable = malloc(sizeof(struct route_table_entry) * 100000);
     DIE(rtable == NULL, "memory");
-    int rtable_len =read_rtable(argv[1], rtable);
+    int rtable_len = read_rtable(argv[1], rtable);
 
     struct arp_entry *mac_table = malloc(sizeof(struct arp_entry) * 100);
     int mac_table_len = 0;
 
     struct queue *queue = queue_create();
+    struct node *tree = create_tree(rtable, rtable_len);
 
 	// Do not modify this line
 	init(argc - 2, argv + 2);
-
 
 	while (1) {
 		int interface;
@@ -189,7 +300,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            struct route_table_entry* best_route = get_best_route(ip_hdr->daddr, rtable, rtable_len);
+            struct route_table_entry* best_route = get_best_route(ip_hdr->daddr, tree);
             if (best_route == NULL) {
                 create_icmp(buf, &len, 3, 0);
                 send_to_link(interface, buf, len);
