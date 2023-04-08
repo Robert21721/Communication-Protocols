@@ -12,12 +12,7 @@
 
 ## *Modalitate de implementare*
 ---
-> Pentru simplificarea implementarii sunt definite doua structuri de date auxiliare (in plus fata de scheletul temei):
- 1. struct **ip_pack** - care contine:
-    * **void \*buf** - pachetul IP pus in coada de asteptare
-    * **uint32_t next_ip** - adresa ip pentru next hop
-    * **int len** - lungimea pachetului
-    * **int interface** - interfata pe care urmeaza sa fie trimis
+> Programul incepe prin initializarea tabelelor de rutare si arp, urmate de creearea trie-ului si a cozii de pachete IP. In continuare, programul intra intr-un while infinit ce are ca scop primirea si trimiterea continua de pachete de diferite tipuri. In functie de pachetul primit, programul il va prelucra si il va redirectiona sau va genera noi pachete pe care le va trimite mai departe.
 
 <br/>
 
@@ -55,7 +50,29 @@ Creearea pachetelor ICMP este facuta cu ajutorul functiei:
 
 >In cazul in care pachetul IP trebuie doar trimis mai departe, se verifica daca este cunoscuta adresa mac a urmatorului hop. In cazul in care aceasta apare in tabela arp, adresele mac sursa si destinatie sunt actualizate iar pachetul este trimis mai departe. In cazul in care adresa mac a destinatiei nu este cunoscuta, pachetul este introdul in coada de asteptare (impreuna cu ip-ul urmatorului hop, interfata de plecare si lungimea sa), iar routerul va trimite un arp request.
 
+Pentru o organizare mai usoara a cozii de pachete IP, am definit o noua structura de date ce contine urmatoarele campuri:
+- struct **ip_pack** - care contine:
+    * **void \*buf** - pachetul IP pus in coada de asteptare
+    * **uint32_t next_ip** - adresa ip pentru next hop
+    * **int len** - lungimea pachetului
+    * **int interface** - interfata pe care urmeaza sa fie trimis
+
 <br/>
 
 ### **ARP**
 ---
+
+Pentru creearea unui arp request am folosit urmatoarea functie:
+- *void* **create_arp_req**(*void* \*buf, *size_t* \*len, *uint32_t* dest_ip, *int* interface) - asemanatoare cu functia create_icmp, aceasta functie seteaza toate campurile necesare unui arp request (modifica mac-ul sursei ca fiind adresa mac a interfetei pe care se trimite, adresa mac a destinatiei e broadcast, actualizeaza lungimea + setarea campurilor spercifice pentru arp request)
+
+>In cazul in care routerul primeste un arp request, acesta va interschimba adresele ip/mac sursa cu destinatie si isi va completa adresa sa mac in locul celei de broadcast. Va seta campul op pe arp reply si va trimite pachetul inapoi.
+
+>In cazul in care routerul primeste un arp reply, acesta introduce noua adresa mac in tabela arp si trimite mai departe toate pachetele care asteapta dupa acea adresa mac.
+Pachetele care asteapta o alta adresa mac sunt puse inapoi in coada de asteptare.
+
+<br/>
+
+**!!! TOATE CERINTELE AU FOST REZOLVATE !!!**
+
+
+

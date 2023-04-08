@@ -24,7 +24,7 @@ struct arp_entry *get_mac_entry(uint32_t ip_dest, struct arp_entry *mac_table, i
 
 // creeaza un pachet de tip icmp
 void create_icmp(void *buf, size_t *len, int type, int code) {
-    void *aux = malloc(*len);
+    void *aux = malloc(MAX_PACKET_LEN);
     DIE(aux == NULL, "malloc");
 
     memcpy(aux, buf, *len);
@@ -56,7 +56,7 @@ void create_icmp(void *buf, size_t *len, int type, int code) {
     ip_hdr->tot_len = htons(sizeof(struct iphdr) + sizeof(struct icmphdr));
     ip_hdr->id = 1;
     ip_hdr->frag_off = 0;
-    ip_hdr->protocol = 1;
+    ip_hdr->protocol = IPPROTO_ICMP;
     ip_hdr->ttl = 64;
     ip_hdr->check = 0;
     ip_hdr->check = htons(checksum((void*)ip_hdr,sizeof(struct iphdr)));
@@ -84,16 +84,10 @@ void create_arp_req(void *buf, size_t *len, uint32_t dest_ip, int interface) {
     struct ether_header *eth_hdr = (struct ether_header*) buf;
     struct arp_header *arp_hdr = (struct arp_header*)(buf + sizeof(struct ether_header));
 
-    // copiez vechiul buffer pentru a folosi headerul ethernet
-    void *aux = malloc(*len);
-    DIE(aux == NULL, "malloc");
-
-    memcpy(aux, buf, *len);
-    struct ether_header *eth_hdr_aux = (struct ether_header*) aux;
     uint32_t source_ip = inet_addr(get_interface_ip(interface));
 
     // setez sursa ca fiind routerul si destinatia broadcast
-    memcpy(eth_hdr->ether_shost, eth_hdr_aux->ether_dhost, 6);
+    get_interface_mac(interface, eth_hdr->ether_shost);
     memset(eth_hdr->ether_dhost, ~0, 6);
     eth_hdr->ether_type = htons(0x806);
 
@@ -112,7 +106,6 @@ void create_arp_req(void *buf, size_t *len, uint32_t dest_ip, int interface) {
 
     // actualizez lungimea
     *len = sizeof(struct ether_header) + sizeof(struct arp_header);
-    free(aux);
 }
 
 
@@ -208,7 +201,7 @@ int main(int argc, char *argv[]) {
                 struct ip_pack *pack = (struct ip_pack*) malloc(sizeof(struct ip_pack));
                 DIE(rtable == NULL, "malloc");
 
-                pack->buf = malloc(1000);
+                pack->buf = malloc(MAX_PACKET_LEN);
                 DIE(pack->buf == NULL, "malloc");
 
                 memcpy(pack->buf, buf, len);
@@ -229,9 +222,9 @@ int main(int argc, char *argv[]) {
             struct arp_header *arp_hdr = (struct arp_header*)(buf + sizeof(struct ether_header));
 
             // copiez masajul primit
-            void *aux = malloc(len);
+            void *aux = malloc(MAX_PACKET_LEN);
             DIE(aux == NULL, "malloc");
-            
+
             memcpy(aux, buf, len);
             struct arp_header *arp_hdr_aux = (struct arp_header*)(aux + sizeof(struct ether_header));
 
@@ -272,19 +265,11 @@ int main(int argc, char *argv[]) {
                 while (!queue_empty(queue)) {
                     struct ip_pack *pack = (struct ip_pack*)queue_deq(queue);
                     struct ether_header *pack_eth = (struct ether_header*)(pack->buf);
-   
-                    int ok = 0;
-                    for (int i = 0; i < mac_table_len; i++) {
-                        // daca am gasit ip ul destinatiei in tabela arp, o copiez in pachet
-                        if (pack->next_ip == mac_table[i].ip) {
-                            memcpy(pack_eth->ether_dhost, mac_table[i].mac, 6);
-                            ok = 1;
-                            break;
-                        }
-                    }
 
-                    if (ok) {
+                    // daca pachetul asteapta dupa arp reply ul pe care tocmai l-am primit
+                    if (pack->next_ip == arp_hdr->spa) {
                         // trimit pachetul
+                        memcpy(pack_eth->ether_dhost, arp_hdr->sha, 6);
                         send_to_link(pack->interface, pack->buf, pack->len); 
                         free(pack->buf);
                         free(pack);
