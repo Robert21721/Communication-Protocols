@@ -21,3 +21,8 @@
   } while (0)
 
 #endif
+
+typedef struct client {
+  char id[20];
+  int sockfd;
+} TClient;

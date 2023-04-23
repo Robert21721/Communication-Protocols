@@ -51,7 +51,7 @@ void run_client(int sockfd) {
 				break;
 			}
 
-			printf("%s", recv_packet.message);
+			// printf("%s", recv_packet.message);
 		}
 
 		if (fds[1].revents & POLLIN) {
@@ -61,8 +61,15 @@ void run_client(int sockfd) {
 			strcpy(sent_packet.message, buf);
 			// sent_packet.client_id = id;
 
+			if(strncmp(buf, "exit", 4) == 0) {
+				close(sockfd);
+				return;
+			} else {
+				send_all(sockfd, &sent_packet, sizeof(sent_packet));
+			}
+
+
 			// Use send_all function to send the pachet to the server.
-			send_all(sockfd, &sent_packet, sizeof(sent_packet));
 		}
 	}
 }
@@ -110,7 +117,7 @@ int main(int argc, char *argv[]) {
 	run_client(sockfd);
 
 	// Inchidem conexiunea si socketul creat
-	close(sockfd);
+	// close(sockfd);
 
 	return 0;
 }
