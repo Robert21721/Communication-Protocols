@@ -25,7 +25,7 @@ int recv_all(int sockfd, void *buffer, size_t len) {
             return 0;
         }
 
-        // printf("crapam normal ca crapam\n");
+        // printf("rcv in plm\n");
         bytes_received = bytes_received + rec;
         bytes_remaining = bytes_remaining - rec;
     }
@@ -52,10 +52,11 @@ int send_all(int sockfd, void *buffer, size_t len) {
             return -1;
         }
 
-        // if (snd == 0) {
-        //     return 0;
-        // }
+        if (snd == 0) {
+            return 0;
+        }
 
+        // printf("send in plm\n");
         bytes_sent = bytes_sent + snd;
         bytes_remaining = bytes_remaining - snd;
     }

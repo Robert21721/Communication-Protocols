@@ -48,7 +48,8 @@ void run_client(int sockfd) {
 		if (fds[0].revents & POLLIN) {
 			int rc = recv_all(sockfd, &recv_packet, sizeof(recv_packet));
 			if (rc <= 0) {
-				break;
+				close(sockfd);
+				return;
 			}
 
 			// printf("%s", recv_packet.message);
@@ -109,10 +110,13 @@ int main(int argc, char *argv[]) {
 	rc = connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 	DIE(rc < 0, "connect");
 
+	// printf("te roh io\n");
 	// trimit un pachet cu id ul clientului
 	strcpy(sent_packet.message, argv[1]);
 	sent_packet.len = strlen(argv[1]) + 1;
 	send_all(sockfd, &sent_packet, sizeof(sent_packet));
+
+	// printf("mori\n");
 
 	run_client(sockfd);
 

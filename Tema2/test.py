@@ -647,12 +647,16 @@ def h2_test():
   #   # generate messages on all topics and check that C1 receives them
   #   run_test_data_subscribed(server, c1, topics)
 
-  #   # stop C1 and check it exits correctly
-  #   success = run_test_c1_stop(server, c1)
-
+    # # stop C1 and check it exits correctly
+    # success = run_test_c1_stop(server, c1)
+  #INCERCAM ASA
+  succes = run_test_c1_stop(server, c1)
+  
   #   if success:
   #     # restart C1 and check that it starts properly
   #     c1, success = run_test_c1_restart(server)
+  #INCERCAM ASA
+  c1, success = run_test_c1_restart(server)
 
   #     if success:
   #       # check that C1 doesn't receive anything from the server
@@ -660,9 +664,13 @@ def h2_test():
 
   #       # connect a client with the same ID as C1 and check that it fails
   #       run_test_same_id(server)
+  # INCERCAM ASA
+  run_test_same_id(server)
 
   #       # start a subscriber C2 and check it is running
   #       c2, success = run_test_c2_start(server)
+  #INCERCAM ASA
+  c2, success = run_test_c2_start(server)
 
   #       if success:
   #         # subscribe C2 to a single non-SF topic and check
@@ -679,6 +687,8 @@ def h2_test():
 
   #         # stop C2 and check it exits correctly
   #         success = run_test_c2_stop(server, c2)
+  # INCERCAM ASA
+  success = run_test_c2_stop(server, c2)
 
   #         if success:
   #           # generate a message on the non-SF topic and check

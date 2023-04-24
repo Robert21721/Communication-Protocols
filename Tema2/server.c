@@ -47,15 +47,17 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 	int num_clients_tcp = 0;
 
 	while (1) {
-
+		// printf("futu ti pizda ma tii\n");
 		rc = poll(poll_fds, num_clients_online, -1);
 		DIE(rc < 0, "poll");
 
 		for (int i = 0; i < num_clients_online; i++) {
-			// printf("%d\n", i);
+			// printf("unde plm sunt %d\n", i);
 			if (poll_fds[i].revents & POLLIN) {
+				// printf("mai intram sau sal\n");
 
 				if (poll_fds[i].fd == STDIN_FILENO) {
+					// printf("drac stdin\n");	
 					char buf[20];
 					fgets(buf, sizeof(buf), stdin);
 
@@ -66,9 +68,14 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 						}
 						return;
 					}
+
+					// break;
 				} else if (poll_fds[i].fd == listenfd_tcp) {
+					// printf("drac tcp\n");
 					// a venit o cerere de conexiune pe socketul inactiv (cel cu listen),
 					// pe care serverul o accepta
+					// printf("ajungem aci\n");
+
 					struct sockaddr_in cli_addr;
 					socklen_t cli_len = sizeof(cli_addr);
 					int newsockfd = accept(listenfd_tcp, (struct sockaddr *)&cli_addr, &cli_len);
@@ -79,7 +86,10 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 					int exist = 0;
 					for (int j = 0; j < num_clients_tcp; j++) {
 						if (strcmp(clients[j].id, received_packet.message) == 0) {
+							// printf("avem id egal\n");
+							// printf("%d\n", num_clients_online);
 							for (int k = 3; k < num_clients_online; k++) {
+								// printf("%d %d\n", poll_fds[k].fd, clients[j].sockfd);
 								if (poll_fds[k].fd == clients[j].sockfd) {
 									close(newsockfd);
 									exist = 1;
@@ -109,24 +119,31 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 							clients[j].sockfd = newsockfd;
 							find = 1;
 							// printf("Clientul %s a mai fost conectat\n", received_packet.message);
-							break;
+							// break;
 						}
 					}
 
 					if (!find) {
+						// printf("tcp cl %d\n", num_clients_tcp);
 						strcpy(clients[num_clients_tcp].id, received_packet.message);
 						clients[num_clients_tcp].sockfd = newsockfd;
 						num_clients_tcp++;
 					}
 
+					// printf("ajung la final\n");
+
 					// primesc un pachet cu id ul clientului
+					// break;
 
 				} else if (poll_fds[i].fd == listenfd_udp) {
+					// printf("drac udp\n");
 					// TODO
 					int rc = recvfrom(listenfd_udp, buf_udp, 1551, 0, (struct sockaddr *)&serv_addr_udp, &socket_len);
 					DIE(rc < 0, "recv from udp");
+					// break;
 
 				} else {
+					// printf("elsu pulii\n");
 				// s-au primit date pe unul din socketii de client,
 				// asa ca serverul trebuie sa le receptioneze
 					int rc = recv_all(poll_fds[i].fd, &received_packet, sizeof(received_packet));
@@ -135,10 +152,11 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 					// printf("%d\n", rc);
 
 					if (rc == 0) {
-						// conexiunea s-a inchis
+						// printf("conexiune inchise\n");
 						for (int j = 0; j < num_clients_tcp; j++) {
 							if (clients[j].sockfd == poll_fds[i].fd) {
 								printf("Client %s disconnected.\n", clients[j].id);
+								clients[j].sockfd = -1;
 								close(poll_fds[i].fd);
 								break;
 							}
@@ -146,23 +164,25 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 
 						// se scoate din multimea de citire socketul inchis
 						for (int j = i; j < num_clients_online - 1; j++) {
-							clients[j] = clients[j + 1];
+							// clients[j] = clients[j + 1];
 							poll_fds[j] = poll_fds[j + 1];
 						}
 
+						poll_fds[num_clients_online - 1].revents = 0;
 						num_clients_online--;
 
-					} else {
-					// printf("S-a primit de la clientul de pe socketul %d mesajul: %s",
-						// poll_fds[i].fd, received_packet.message);
+					} 
+					// else {
+					// // printf("S-a primit de la clientul de pe socketul %d mesajul: %s",
+					// 	// poll_fds[i].fd, received_packet.message);
 
-					/* TODO 2.1: Trimite mesajul catre toti ceilalti clienti */
-						for (int j = 3; j < num_clients_online; j++) {
-							if (j != i) {
-								send_all(poll_fds[j].fd, &received_packet, sizeof(received_packet));
-							}
-						}
-					}
+					// /* TODO 2.1: Trimite mesajul catre toti ceilalti clienti */
+					// 	for (int j = 3; j < num_clients_online; j++) {
+					// 		if (j != i) {
+					// 			send_all(poll_fds[j].fd, &received_packet, sizeof(received_packet));
+					// 		}
+					// 	}
+					// }
 				}
 			}
 		}
