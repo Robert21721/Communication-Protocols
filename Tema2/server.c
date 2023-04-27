@@ -4,29 +4,23 @@
 * Echo Server
 * server.c
 */
-
-#include <arpa/inet.h>
-#include <errno.h>
-#include <netinet/in.h>
-#include <poll.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-
 #include "common.h"
 #include "helpers.h"
+#include "tcp.h"
 
 #define MAX_CONNECTIONS 32
 
 TClient clients[MAX_CONNECTIONS];
+TTopic *topics;
 struct sockaddr_in serv_addr_tcp, serv_addr_udp;
 socklen_t socket_len = sizeof(struct sockaddr_in);
 char *buf_udp;
 
 void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
+
+	FILE *debug = fopen("log.txt", "wt");
+	topics = malloc(100 * sizeof(TTopic));
+	int topics_size = 0;
 
 	struct pollfd poll_fds[MAX_CONNECTIONS];
 	struct chat_packet received_packet;
@@ -45,23 +39,19 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 	poll_fds[2].events = POLLIN;
 	int num_clients_online = 3;
 	int num_clients_tcp = 0;
+	int num_topics = 0;
 
 	while (1) {
 		// printf("futu ti pizda ma tii\n");
-		rc = poll(poll_fds, num_clients_online, -1);
-		DIE(rc < 0, "poll");
+		int nr_of_events = poll(poll_fds, num_clients_online, -1);
+		DIE(nr_of_events < 0, "poll");
 
-		for (int i = 0; i < num_clients_online; i++) {
-			// printf("unde plm sunt %d\n", i);
+		for (int i = 0; i < num_clients_online && nr_of_events != 0; i++) {
 			if (poll_fds[i].revents & POLLIN) {
-				// printf("mai intram sau sal\n");
-
 				if (poll_fds[i].fd == STDIN_FILENO) {
-					// printf("drac stdin\n");	
 					char buf[20];
 					fgets(buf, sizeof(buf), stdin);
 
-					// printf("Socket-ul client %d a inchis conexiunea\n", i);
 					if(strncmp(buf, "exit", 4) == 0) {
 						for (int j = 1; j < num_clients_online; j++) {
 							close(poll_fds[j].fd);
@@ -69,12 +59,7 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 						return;
 					}
 
-					// break;
 				} else if (poll_fds[i].fd == listenfd_tcp) {
-					// printf("drac tcp\n");
-					// a venit o cerere de conexiune pe socketul inactiv (cel cu listen),
-					// pe care serverul o accepta
-					// printf("ajungem aci\n");
 
 					struct sockaddr_in cli_addr;
 					socklen_t cli_len = sizeof(cli_addr);
@@ -83,73 +68,62 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 
 					recv_all(newsockfd, &received_packet, sizeof(received_packet));
 
-					int exist = 0;
-					for (int j = 0; j < num_clients_tcp; j++) {
-						if (strcmp(clients[j].id, received_packet.message) == 0) {
-							// printf("avem id egal\n");
-							// printf("%d\n", num_clients_online);
-							for (int k = 3; k < num_clients_online; k++) {
-								// printf("%d %d\n", poll_fds[k].fd, clients[j].sockfd);
-								if (poll_fds[k].fd == clients[j].sockfd) {
-									close(newsockfd);
-									exist = 1;
-									break;
-									break;
-								}
-							}
-						}
-					}
-
-					if (exist) {
+					int connected = is_client_connected(num_clients_tcp, num_clients_online, clients, received_packet.message, poll_fds);
+					if (connected) {
+						close(newsockfd);
 						printf("Client %s already connected.\n", received_packet.message);
+						nr_of_events--;
 						continue;
 					}
 
 					printf("New client %s connected from %s:%d.\n", received_packet.message, inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
-					// se adauga noul socket intors de accept() la multimea descriptorilor
-					// de citire
 					poll_fds[num_clients_online].fd = newsockfd;
 					poll_fds[num_clients_online].events = POLLIN;
 					num_clients_online++;
 
-
-					int find = 0;
-					for (int j = 0; j < num_clients_tcp; j++) {
-						if (strcmp(clients[j].id, received_packet.message) == 0) {
-							clients[j].sockfd = newsockfd;
-							find = 1;
-							// printf("Clientul %s a mai fost conectat\n", received_packet.message);
-							// break;
-						}
-					}
+					int find = not_first_time(num_clients_tcp, clients, received_packet.message, newsockfd);
 
 					if (!find) {
-						// printf("tcp cl %d\n", num_clients_tcp);
 						strcpy(clients[num_clients_tcp].id, received_packet.message);
 						clients[num_clients_tcp].sockfd = newsockfd;
 						num_clients_tcp++;
 					}
 
-					// printf("ajung la final\n");
-
-					// primesc un pachet cu id ul clientului
-					// break;
+					nr_of_events--;
 
 				} else if (poll_fds[i].fd == listenfd_udp) {
-					// printf("drac udp\n");
 					// TODO
 					int rc = recvfrom(listenfd_udp, buf_udp, 1551, 0, (struct sockaddr *)&serv_addr_udp, &socket_len);
 					DIE(rc < 0, "recv from udp");
-					// break;
 
+					char name[51];
+					memcpy(name, buf_udp, 50);
+					name[50] = '\0';
+
+					uint8_t type = buf_udp[50];
+
+					// fprintf(debug, "%s\n", name);
+					// fflush(debug);
+
+					for (int i = 0; i < topics_size; i++) {
+						if (strcmp(topics[i].name, name) == 0) {
+							// TODO: add new msg + function
+						}
+					}
+
+					// create new + function
+					topics[topics_size].messages_len = 0;
+					strcpy(topics[topics_size].name, name);
+					topics[topics_size].messages = malloc(10000 * sizeof(TUdpMsg));
+
+					topics[topics_size].messages[0].type = type;
+					memcpy(topics[topics_size].messages[0].msg, buf_udp + 51, 1500);
+					topics[topics_size].messages_len++;
+					topics_size++;
+					
 				} else {
-					// printf("elsu pulii\n");
-				// s-au primit date pe unul din socketii de client,
-				// asa ca serverul trebuie sa le receptioneze
 					int rc = recv_all(poll_fds[i].fd, &received_packet, sizeof(received_packet));
 					DIE(rc < 0, "recv");
-
-					// printf("%d\n", rc);
 
 					if (rc == 0) {
 						// printf("conexiune inchise\n");

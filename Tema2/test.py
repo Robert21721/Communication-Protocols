@@ -637,71 +637,71 @@ def h2_test():
   # start a subscriber C1 and check it is running
   c1, success = run_test_c1_start(server)
 
-  # if success:    
-  #   # generate data and check that it isn't received by C1
-  #   run_test_data_unsubscribed(server, c1)
+  if success:    
+    # generate data and check that it isn't received by C1
+    run_test_data_unsubscribed(server, c1)
 
-  #   # subscribe C1 to all topics and verify
-  #   run_test_c1_subscribe_all(server, c1, topics)
+    # subscribe C1 to all topics and verify
+    run_test_c1_subscribe_all(server, c1, topics)
 
-  #   # generate messages on all topics and check that C1 receives them
-  #   run_test_data_subscribed(server, c1, topics)
+    # generate messages on all topics and check that C1 receives them
+    run_test_data_subscribed(server, c1, topics)
 
-    # # stop C1 and check it exits correctly
-    # success = run_test_c1_stop(server, c1)
-  #INCERCAM ASA
-  succes = run_test_c1_stop(server, c1)
+    # stop C1 and check it exits correctly
+    success = run_test_c1_stop(server, c1)
+  # #INCERCAM ASA
+  # succes = run_test_c1_stop(server, c1)
   
-  #   if success:
-  #     # restart C1 and check that it starts properly
-  #     c1, success = run_test_c1_restart(server)
-  #INCERCAM ASA
-  c1, success = run_test_c1_restart(server)
+    if success:
+      # restart C1 and check that it starts properly
+      c1, success = run_test_c1_restart(server)
+  # #INCERCAM ASA
+  # c1, success = run_test_c1_restart(server)
 
-  #     if success:
-  #       # check that C1 doesn't receive anything from the server
-  #       run_test_data_no_clients(c1)
+      if success:
+        # check that C1 doesn't receive anything from the server
+        run_test_data_no_clients(c1)
 
-  #       # connect a client with the same ID as C1 and check that it fails
-  #       run_test_same_id(server)
-  # INCERCAM ASA
-  run_test_same_id(server)
+        # connect a client with the same ID as C1 and check that it fails
+        run_test_same_id(server)
+  # # INCERCAM ASA
+  # run_test_same_id(server)
 
-  #       # start a subscriber C2 and check it is running
-  #       c2, success = run_test_c2_start(server)
-  #INCERCAM ASA
-  c2, success = run_test_c2_start(server)
+        # start a subscriber C2 and check it is running
+        c2, success = run_test_c2_start(server)
+  # #INCERCAM ASA
+  # c2, success = run_test_c2_start(server)
 
-  #       if success:
-  #         # subscribe C2 to a single non-SF topic and check
-  #         run_test_c2_subscribe(c2, topics)
+        if success:
+          # subscribe C2 to a single non-SF topic and check
+          run_test_c2_subscribe(c2, topics)
 
-  #         # subscribe C2 to a single SF topic and check
-  #         run_test_c2_subscribe_sf(c2, topics)
+          # subscribe C2 to a single SF topic and check
+          run_test_c2_subscribe_sf(c2, topics)
 
-  #         # generate a message on the non-SF topic and check
-  #         run_test_data_no_sf(c1, c2, topics)
+          # generate a message on the non-SF topic and check
+          run_test_data_no_sf(c1, c2, topics)
 
-  #         # generate a message on the SF topic and check
-  #         run_test_data_sf(c1, c2, topics)
+          # generate a message on the SF topic and check
+          run_test_data_sf(c1, c2, topics)
 
-  #         # stop C2 and check it exits correctly
-  #         success = run_test_c2_stop(server, c2)
-  # INCERCAM ASA
-  success = run_test_c2_stop(server, c2)
+          # stop C2 and check it exits correctly
+          success = run_test_c2_stop(server, c2)
+  # # INCERCAM ASA
+  # success = run_test_c2_stop(server, c2)
 
-  #         if success:
-  #           # generate a message on the non-SF topic and check
-  #           run_test_data_no_sf_2(c1, topics)
+          if success:
+            # generate a message on the non-SF topic and check
+            run_test_data_no_sf_2(c1, topics)
 
-  #           # generate three messages on the non-SF topic and check
-  #           run_test_data_sf_2(c1, topics)
+            # generate three messages on the non-SF topic and check
+            run_test_data_sf_2(c1, topics)
 
-  #           # restart C2 and check that all SF messages are received
-  #           c2 = run_test_c2_restart_sf(server, topics)
+            # restart C2 and check that all SF messages are received
+            c2 = run_test_c2_restart_sf(server, topics)
 
-  #   # send all types of message 30 times in quick succesion and check
-  #   run_test_quick_flow(c1, topics)
+    # send all types of message 30 times in quick succesion and check
+    run_test_quick_flow(c1, topics)
 
   # close the server and check that C1 also closes
   run_test_server_stop(server, c1)

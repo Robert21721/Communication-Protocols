@@ -1,0 +1,2 @@
+int is_client_connected(int num_clients_tcp, int num_clients_online, TClient *clients, char *msg, struct pollfd *poll_fds);
+int not_first_time(int num_clients_tcp, TClient *clients, char *msg, int newsockfd);

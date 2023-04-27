@@ -15,8 +15,11 @@ all: server subscriber
 
 common.o: common.c
 
+tcp.o: tcp.c
+
+udp.o: udp.c
 # Compileaza server.c
-server: server.c common.o
+server: server.c common.o tcp.o udp.o
 
 # Compileaza subscriber.c
 subscriber: subscriber.c common.o

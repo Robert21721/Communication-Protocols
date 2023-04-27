@@ -26,3 +26,14 @@ typedef struct client {
   char id[20];
   int sockfd;
 } TClient;
+
+typedef struct udp_msg {
+  uint8_t type;
+  char msg[1500];
+} TUdpMsg;
+
+typedef struct topic {
+  char name[51];
+  TUdpMsg *messages;
+  int messages_len;
+} TTopic;
