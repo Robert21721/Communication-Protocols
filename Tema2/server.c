@@ -14,9 +14,15 @@ char *buf_udp;
 char *buf_tcp;
 
 void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
+
 	topics = malloc(INITIAL_SIZE * sizeof(TTopic));
-	clients = (TClient*) malloc(INITIAL_SIZE * sizeof(TClient));
+	DIE(topics == NULL, "malloc");
 	int topics_size = 0;
+	int num_max_topics = INITIAL_SIZE;
+
+	clients = (TClient*) malloc(INITIAL_SIZE * sizeof(TClient));
+	DIE(clients == NULL, "malloc");
+	int num_max_clients = INITIAL_SIZE;
 
 	struct pollfd poll_fds[MAX_CONNECTIONS];
 	struct chat_packet received_packet;
@@ -84,6 +90,7 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 
 					// daca este un client nou
 					printf("New client %s connected from %s:%d.\n", received_packet.message, inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
+
 					poll_fds[num_clients_online].fd = newsockfd;
 					poll_fds[num_clients_online].events = POLLIN;
 					num_clients_online++;
@@ -105,6 +112,12 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 
 					// daca este prima data, il adaugam in lista
 					if (first_time) {
+						if (num_clients_tcp == num_max_clients) {
+							clients = realloc(clients, 2 * num_clients_tcp);
+							DIE(clients == NULL, "realloc");
+							num_max_clients = 2 * num_max_clients;
+						}
+
 						strcpy(clients[num_clients_tcp].id, received_packet.message);
 						clients[num_clients_tcp].sockfd = newsockfd;
 						clients[num_clients_tcp].online = 1;
@@ -183,10 +196,16 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 
 					// daca nu exista, il adaugam in lista
 					if (!topic_exists) {
+						if (topics_size == num_max_topics) {
+							topics = realloc(topics, 2 * topics_size);
+							DIE(topics == NULL, "realloc");
+							num_max_topics = 2 * num_max_topics;
+						}
 						topics[topics_size].messages_len = 0;
 						strcpy(topics[topics_size].name, name);
 
 						topics[topics_size].messages = (TUdpMsg *) malloc(INITIAL_SIZE * sizeof(TUdpMsg));
+						DIE(topics[topics_size].messages == NULL, "malloc");
 						strcpy(topics[topics_size].messages[0].msg, send_packet.message);
 						topics[topics_size].messages_len++;
 						topics_size++;
@@ -289,6 +308,13 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 			}
 		}
 	}
+
+	for (int i = 0; i < topics_size; i++) {
+		free(topics[i].messages);
+	}
+
+	free(topics);
+	free(clients);
 }
 
 	int main(int argc, char *argv[]) {
@@ -301,26 +327,24 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 	// Parsam port-ul ca un numar
 	uint16_t port;
 	buf_udp = (char*) malloc(1551 * sizeof(char));
-	// buf_tcp = (char*) malloc(2000 * sizeof(char));
+	DIE(buf_udp == NULL, "malloc");
 
 	int rc = sscanf(argv[1], "%hu", &port);
 	DIE(rc != 1, "Given port is invalid");
 
-	// Obtinem un socket TCP pentru receptionarea conexiunilor
+	// TCP socket pentru asteptarea conexiunilor
 	int listenfd_tcp = socket(AF_INET, SOCK_STREAM, 0);
 	DIE(listenfd_tcp < 0, "socket");
 
+	// UDP socket pentru primirea mesajelor
 	int listenfd_udp = socket(PF_INET, SOCK_DGRAM, 0);
 	DIE(listenfd_udp < 0, "socket");
 
+	// dezactivarea algoritmului lui Nagle
 	int enable = 1;
 	setsockopt(listenfd_tcp, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(int));
 
-	// Completăm in serv_addr adresa serverului, familia de adrese si portul
-	// pentru conectare
-
-	// Facem adresa socket-ului reutilizabila, ca sa nu primim eroare in caz ca
-	// rulam de 2 ori rapid
+	// Facem adresa socket-ului reutilizabila
 	enable = 1;
 	if (setsockopt(listenfd_tcp, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
 		perror("setsockopt(SO_REUSEADDR) failed");
@@ -329,25 +353,20 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 	serv_addr_tcp.sin_family = AF_INET;
 	serv_addr_tcp.sin_port = htons(port);
 	serv_addr_tcp.sin_addr.s_addr = INADDR_ANY;
-	// DIE(rc <= 0, "inet_pton");
 
 	memset(&serv_addr_udp, 0, socket_len);
 	serv_addr_udp.sin_family = AF_INET;
 	serv_addr_udp.sin_port = htons(port);
 	serv_addr_udp.sin_addr.s_addr = INADDR_ANY;
 
-	// Asociem adresa serverului cu socketul creat folosind bind
+	// Asociem adresa serverului cu socketul tcp si cel udp
 	rc = bind(listenfd_tcp, (const struct sockaddr *)&serv_addr_tcp, sizeof(serv_addr_tcp));
 	DIE(rc < 0, "bind");
 
 	rc = bind(listenfd_udp, (const struct sockaddr *)&serv_addr_udp, sizeof(serv_addr_udp));
 	DIE(rc < 0, "bind");
 
-	// run_chat_server(listenfd);
 	run_chat_multi_server(listenfd_tcp, listenfd_udp);
-
-	// Inchidem listenfd
-	// close(listenfd);
 	free(buf_udp);
 
 	return 0;

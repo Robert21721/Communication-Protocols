@@ -34,10 +34,10 @@ void send_old_msg(TClient client, int topics_size, TTopic *topics, struct chat_p
         for (int j = 0; j < topics_size; j++) {
             // am gasit un topic la care clientul a dat subscribe
             if (strcmp(client.topics_name[i], topics[j].name) == 0) {
-
-                // 
                 for (int k = client.last_msg_idx[i]; k < topics[j].messages_len; k++) {
+                    // daca clientul a dat subscribe cu flagul 1
                     if (client.last_msg_idx[i] != -1) {
+                        // trimit toate mesajele pe care le a ratat
                         strcpy(send_packet->message, topics[j].messages[k].msg);
                         send_packet->len = strlen(topics[j].messages[k].msg) + 1;
 
