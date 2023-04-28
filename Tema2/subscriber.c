@@ -20,12 +20,17 @@
 #include "common.h"
 #include "helpers.h"
 
+uint16_t port;
+char ip_addr[20];
+
 void run_client(int sockfd) {
 	char buf[MSG_MAXSIZE + 1];
 	memset(buf, 0, MSG_MAXSIZE + 1);
 
 	struct chat_packet sent_packet;
 	struct chat_packet recv_packet;
+
+	FILE *debug = fopen("log_subscr.txt", "wt");
 
 	/* TODO 2.2: Multiplexeaza intre citirea de la tastatura si primirea unui
 		mesaj, ca sa nu mai fie impusa ordinea.
@@ -50,7 +55,13 @@ void run_client(int sockfd) {
 			if (rc <= 0) {
 				close(sockfd);
 				return;
+
+			
 			}
+
+			fprintf(debug, "%s %hu %s\n", ip_addr, port, recv_packet.message);
+			printf("%s:%hu %s\n", ip_addr, port, recv_packet.message);
+			fflush(debug);
 
 			// printf("%s", recv_packet.message);
 		}
@@ -67,6 +78,11 @@ void run_client(int sockfd) {
 				return;
 			} else {
 				send_all(sockfd, &sent_packet, sizeof(sent_packet));
+				if (strncmp(sent_packet.message, "subscribe", 9) == 0) {
+					printf("Subscribed to topic.\n");
+				} else {
+					printf("Unsubscribed from topic.\n");
+				}
 			}
 
 
@@ -86,14 +102,18 @@ int main(int argc, char *argv[]) {
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 
 	// Parsam port-ul ca un numar
-	uint16_t port;
 	struct chat_packet sent_packet;
 	int rc = sscanf(argv[3], "%hu", &port);
 	DIE(rc != 1, "Given port is invalid");
 
+	strcpy(ip_addr, argv[2]);
+
 	// Obtinem un socket TCP pentru conectarea la server
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	DIE(sockfd < 0, "socket");
+
+	int enable = 1;
+	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(int));
 
 	// Completăm in serv_addr adresa serverului, familia de adrese si portul
 	// pentru conectare

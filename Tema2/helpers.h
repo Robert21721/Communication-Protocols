@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+// #include <stdint.h>
 
 /*
  * Macro de verificare a erorilor
@@ -22,18 +23,23 @@
 
 #endif
 
-typedef struct client {
-  char id[20];
-  int sockfd;
-} TClient;
 
 typedef struct udp_msg {
   uint8_t type;
-  char msg[1500];
+  char msg[2000];
 } TUdpMsg;
 
 typedef struct topic {
   char name[51];
-  TUdpMsg *messages;
+  TUdpMsg messages[100];
   int messages_len;
 } TTopic;
+
+typedef struct client {
+  char id[20];
+  int sockfd;
+  char topics_name[100][51];
+  int topics_len;
+  int online;
+  int last_msg_idx[100];
+} TClient;

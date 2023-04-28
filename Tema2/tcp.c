@@ -20,7 +20,7 @@ int not_first_time(int num_clients_tcp, TClient *clients, char *msg, int newsock
     for (int j = 0; j < num_clients_tcp; j++) {
         if (strcmp(clients[j].id, msg) == 0) {
             clients[j].sockfd = newsockfd;
-            // printf("a mai fost =)\n");
+            clients[j].online = 1;
             return 1;
         }
     }

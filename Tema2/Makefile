@@ -19,7 +19,7 @@ tcp.o: tcp.c
 
 udp.o: udp.c
 # Compileaza server.c
-server: server.c common.o tcp.o udp.o
+server: server.c common.o tcp.o udp.o -lm
 
 # Compileaza subscriber.c
 subscriber: subscriber.c common.o
