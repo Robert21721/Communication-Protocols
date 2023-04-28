@@ -25,13 +25,12 @@
 
 
 typedef struct udp_msg {
-  uint8_t type;
   char msg[2000];
 } TUdpMsg;
 
 typedef struct topic {
   char name[51];
-  TUdpMsg messages[100];
+  TUdpMsg *messages;
   int messages_len;
 } TTopic;
 

@@ -27,3 +27,34 @@ int not_first_time(int num_clients_tcp, TClient *clients, char *msg, int newsock
 
     return 0;
 }
+
+
+void send_old_msg(TClient client, int topics_size, TTopic *topics, struct chat_packet *send_packet) {
+    for (int i = 0; i < client.topics_len; i++) {
+        for (int j = 0; j < topics_size; j++) {
+            // am gasit un topic la care clientul a dat subscribe
+            if (strcmp(client.topics_name[i], topics[j].name) == 0) {
+
+                // 
+                for (int k = client.last_msg_idx[i]; k < topics[j].messages_len; k++) {
+                    if (client.last_msg_idx[i] != -1) {
+                        strcpy(send_packet->message, topics[j].messages[k].msg);
+                        send_packet->len = strlen(topics[j].messages[k].msg) + 1;
+
+                        send_all(client.sockfd, send_packet, sizeof(struct chat_packet));
+                    }
+                }
+            }
+        }
+    }
+}
+
+void update_idx_list(TClient client, int topics_size, TTopic *topics) {
+    for (int i = 0; i < topics_size; i++) {
+        for (int j = 0; j < client.topics_len; j++) {
+            if (strcmp(topics[i].name, client.topics_name[j]) == 0) {
+                client.last_msg_idx[j] = topics[i].messages_len - 1;
+            }
+        }
+    }
+}

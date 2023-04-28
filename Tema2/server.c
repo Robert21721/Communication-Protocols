@@ -4,8 +4,9 @@
 #include "udp.h"
 
 #define MAX_CONNECTIONS 32
+#define INITIAL_SIZE 100
 
-TClient clients[MAX_CONNECTIONS];
+TClient *clients;
 TTopic *topics;
 struct sockaddr_in serv_addr_tcp, serv_addr_udp;
 socklen_t socket_len = sizeof(struct sockaddr_in);
@@ -13,21 +14,19 @@ char *buf_udp;
 char *buf_tcp;
 
 void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
-
-	FILE *debug = fopen("log.txt", "wt");
-	topics = malloc(100 * sizeof(TTopic));
+	topics = malloc(INITIAL_SIZE * sizeof(TTopic));
+	clients = (TClient*) malloc(INITIAL_SIZE * sizeof(TClient));
 	int topics_size = 0;
 
 	struct pollfd poll_fds[MAX_CONNECTIONS];
 	struct chat_packet received_packet;
 	struct chat_packet send_packet;
 
-	// Setam socket-ul listenfd pentru ascultare
+	// Setam socket-ul listenfd_tcp pentru ascultare
 	int rc = listen(listenfd_tcp, MAX_CONNECTIONS);
 	DIE(rc < 0, "listen");
 
-	// se adauga noul file descriptor (socketul pe care se asculta conexiuni) in
-	// multimea read_fds
+	// stdin, socketul de conexiuni tcp si cel udp vor fi adaugate de la inceput
 	poll_fds[0].fd = STDIN_FILENO;
 	poll_fds[0].events = POLLIN;
 	poll_fds[1].fd = listenfd_tcp;
@@ -36,19 +35,25 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 	poll_fds[2].events = POLLIN;
 	int num_clients_online = 3;
 	int num_clients_tcp = 0;
-	// int num_topics = 0;
 
 	while (1) {
-		// printf("futu ti pizda ma tii\n");
+
+		// utilizam poll pentru a putea trimite/ primi mesaje fara a bloca serverul
 		int nr_of_events = poll(poll_fds, num_clients_online, -1);
 		DIE(nr_of_events < 0, "poll");
 
+		// parcurgem lista de filedescriptori
 		for (int i = 0; i < num_clients_online && nr_of_events != 0; i++) {
+
+			// in cazul in care avem un eveniment setat
 			if (poll_fds[i].revents & POLLIN) {
+
+				// daca este input de la tastatura
 				if (poll_fds[i].fd == STDIN_FILENO) {
 					char buf[20];
 					fgets(buf, sizeof(buf), stdin);
 
+					// inchidem serverul si clientii
 					if(strncmp(buf, "exit", 4) == 0) {
 						for (int j = 1; j < num_clients_online; j++) {
 							close(poll_fds[j].fd);
@@ -56,15 +61,19 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 						return;
 					}
 
+				// daca am primit o cerere de conexiune tcp
 				} else if (poll_fds[i].fd == listenfd_tcp) {
 
+					// acceptam cererea
 					struct sockaddr_in cli_addr;
 					socklen_t cli_len = sizeof(cli_addr);
 					int newsockfd = accept(listenfd_tcp, (struct sockaddr *)&cli_addr, &cli_len);
 					DIE(newsockfd < 0, "accept");
 
+					// primim un mesaj ce contine ID ul clientului
 					recv_all(newsockfd, &received_packet, sizeof(received_packet));
 
+					// in cazul in care era deja conectat, inchidem conexiunea
 					int connected = is_client_connected(num_clients_tcp, num_clients_online, clients, received_packet.message, poll_fds);
 					if (connected) {
 						close(newsockfd);
@@ -73,52 +82,40 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 						continue;
 					}
 
+					// daca este un client nou
 					printf("New client %s connected from %s:%d.\n", received_packet.message, inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
 					poll_fds[num_clients_online].fd = newsockfd;
 					poll_fds[num_clients_online].events = POLLIN;
 					num_clients_online++;
 
-					// int find = not_first_time(num_clients_tcp, clients, received_packet.message, newsockfd);
-					int ok = 0;
+
+					int first_time = 1;
 					for (int j = 0; j < num_clients_tcp; j++) {
 						if (strcmp(clients[j].id, received_packet.message) == 0) {
+							// in cazul in care nu este prima data cand se conecteaza
 							clients[j].sockfd = newsockfd;
 							clients[j].online = 1;
 
-							for (int k = 0; k < clients[j].topics_len; k++) {
-								for (int l = 0; l < topics_size; l++) {
-									if (strcmp(clients[j].topics_name[k], topics[l].name) == 0) {
-										fprintf(debug, "am gasit ceva %s\n", topics[l].name);
-										fflush(debug);
-
-										for (int m = clients[j].last_msg_idx[k]; m < topics[l].messages_len; m++) {
-											if (clients[j].last_msg_idx[k] != -1) {
-												strcpy(send_packet.message, topics[l].messages[m].msg);
-												send_packet.len = strlen(topics[l].messages[m].msg) + 1;
-
-												send_all(clients[j].sockfd, &send_packet, sizeof(struct chat_packet));
-											}
-										}
-									}
-								}
-							}
-							// for (int k = clients[j].last_msg_idx;)
-							ok = 1;
+							// trimitem mesajele din urma (daca este cazul)
+							send_old_msg(clients[j], topics_size, topics, &send_packet);
+							first_time = 0;
 							break;
 						}
 					}
 
-					if (!ok) {
+					// daca este prima data, il adaugam in lista
+					if (first_time) {
 						strcpy(clients[num_clients_tcp].id, received_packet.message);
 						clients[num_clients_tcp].sockfd = newsockfd;
 						clients[num_clients_tcp].online = 1;
 						num_clients_tcp++;
 					}
 
+					// am rezolvat unul dintre evenimente
 					nr_of_events--;
 
+				// daca am primit un mesaj pe socketul udp
 				} else if (poll_fds[i].fd == listenfd_udp) {
-					// TODO
 					int rc = recvfrom(listenfd_udp, buf_udp, 1551, 0, (struct sockaddr *)&serv_addr_udp, &socket_len);
 					DIE(rc < 0, "recv from udp");
 
@@ -128,11 +125,12 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 
 					uint8_t type = buf_udp[50];
 
+					// daca mesajul este de tipul 0
 					if (type == 0) {
-						// fprintf(debug, "%s %d %hhu, %d\n", name, type, *(uint8_t *)(buf_udp + 51), ntohl(*(uint32_t*)(buf_udp + 52)));
 						uint8_t sign = *(uint8_t *)(buf_udp + 51);
 						uint32_t nr = ntohl(*(uint32_t*)(buf_udp + 52));
 
+						// cu sau fara semn
 						if (sign == 0) {
 							sprintf(send_packet.message, "%s - INT - %d", name, nr);
 						} else {
@@ -140,16 +138,16 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 						}
 
 					} else if (type == 1) {
+
 						uint16_t nr = htons(*(uint16_t*)(buf_udp + 51));
 						sprintf(send_packet.message, "%s - SHORT_REAL - %.2f", name, (float)abs(nr) / 100);
-						// fprintf(debug, "%s %d %hu\n", name, type, htons(*(uint16_t*)(buf_udp + 51)));
 					} else if (type == 2) {
-						//fprintf(debug, "%s %d %hd\n", name, type, buf_udp + 51);
-						// fprintf(debug, "complicat\n");
+
 						uint8_t sign = *(uint8_t *)(buf_udp + 51);
 						uint32_t nr = ntohl(*(uint32_t*)(buf_udp + 52));
 						uint8_t pw = *(uint8_t *)(buf_udp + 56);
 
+						// cu sau fara semn
 						if (sign == 0) {
 							sprintf(send_packet.message, "%s - FLOAT - %.10g", name, (double) nr / pow(10, pw));
 						} else {
@@ -157,122 +155,135 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 						}
 
 					} else {
-						// fprintf(debug, "%s %d %s\n", name, type, buf_udp + 51);
 						sprintf(send_packet.message, "%s - STRING - %s", name, buf_udp + 51);
 					}
 
 					send_packet.len = strlen(send_packet.message) + 1;
-					// fprintf(debug, "%s\n",send_packet.message);
-					// fflush(debug);
 
+					// parcurgem clientii tcp si daca gasim unul online care este si abonat
+					// topicului primit, ii trimitem mesajul
 					for (int j = 0; j < num_clients_tcp; j++) {
 						if (clients[j].online && is_subscriber(clients[j], name)) {
 							send_all(clients[j].sockfd, &send_packet, sizeof(struct chat_packet));
 						}
 					}
 
-					int ok = 0;
+					// in cazul in care topicul primit exista
+					int topic_exists = 0;
 					for (int j = 0; j < topics_size; j++) {
 						if (strcmp(topics[j].name, name) == 0) {
-							// TODO: add new msg + function
+							// retinem mesajul
 							int len = topics[j].messages_len;
-							topics[j].messages[len].type = type;
 							strcpy(topics[j].messages[len].msg, send_packet.message);
 							topics[j].messages_len++;
-							ok = 1;
+							topic_exists = 1;
 							break;
 						}
 					}
 
-					// create new + function
-					if (!ok) {
+					// daca nu exista, il adaugam in lista
+					if (!topic_exists) {
 						topics[topics_size].messages_len = 0;
 						strcpy(topics[topics_size].name, name);
-						// topics[topics_size].messages = malloc(1000 * sizeof(TUdpMsg));
 
-						topics[topics_size].messages[0].type = type;
+						topics[topics_size].messages = (TUdpMsg *) malloc(INITIAL_SIZE * sizeof(TUdpMsg));
 						strcpy(topics[topics_size].messages[0].msg, send_packet.message);
 						topics[topics_size].messages_len++;
 						topics_size++;
 
-						// fprintf(debug, "\n\n\n NEW TOPIC: %s \n\n\n", name);
-						// fflush(debug);
 					}
 
+					// am rezolvat unul dintre evenimente
 					nr_of_events--;
 
+				// orimim date de la unul din clientii tcp
 				} else {
 					int rc = recv_all(poll_fds[i].fd, &received_packet, sizeof(received_packet));
 					DIE(rc < 0, "recv");
 
-					// fprintf(debug, "start\n");
-					// fflush(debug);
-
+					// in cazul in care este o cerere de deconectare
 					if (rc == 0) {
-						// printf("conexiune inchise\n");
 						for (int j = 0; j < num_clients_tcp; j++) {
 							if (clients[j].sockfd == poll_fds[i].fd) {
 								printf("Client %s disconnected.\n", clients[j].id);
 								clients[j].sockfd = -1;
 								clients[j].online = 0;
+
+								// actualizeaza index-urile ultimelor notificari primite
+								update_idx_list(clients[j], topics_size, topics);
 								close(poll_fds[i].fd);
 								break;
 							}
 						}
 
-						// fprintf(debug, "aici crapam\n");
-						// fflush(debug);
-
-						// se scoate din multimea de citire socketul inchis
+						// se scoate din lista socketul inchis
 						for (int j = i; j < num_clients_online - 1; j++) {
-							// clients[j] = clients[j + 1];
 							poll_fds[j] = poll_fds[j + 1];
 						}
 
-						poll_fds[num_clients_online - 1].revents = 0;
 						num_clients_online--;
 
+					// am primit o cerere de subscribe/ unsubscribe
 					} else {
-					// fprintf(debug, "S-a primit de la clientul de pe socketul %d mesajul: %s",
-					// poll_fds[i].fd, received_packet.message);
-					// fflush(debug);
 
-					/* TODO 2.1: Trimite mesajul catre toti ceilalti clienti */
-						// for (int j = 3; j < num_clients_online; j++) {
-							// if (j != i) {
-							// 	send_all(poll_fds[j].fd, &received_packet, sizeof(received_packet));
-							// }
-							// }
+						// daca cererea este de subscribe
+						char *p = strtok(received_packet.message, " ");
 
-					// subscribe simplu
-						if (strncmp(received_packet.message, "subscribe", 9) == 0) {
-							char *p = strtok(received_packet.message, " ");
+						if (strcmp(p, "subscribe") == 0) {
 							char *topic = strtok(NULL, " ");
 							char* sf = strtok(NULL, " ");
 
 							for (int j = 0; j < num_clients_tcp; j++) {
+								// am gasit clientul care a trimis mesajul
 								if (poll_fds[i].fd == clients[j].sockfd) {
+
+									// daca falgul este 0
 									if (sf[0] == '0') {
+										// adaugam topicul in lista
 										int len = clients[j].topics_len;
 										strcpy(clients[j].topics_name[len], topic);
 										clients[j].last_msg_idx[len] = -1;
 										clients[j].topics_len++;
+
+									// daca flagul este 1
 									} else {
+										// adaugam topicul in lista
 										int len = clients[j].topics_len;
 										strcpy(clients[j].topics_name[len], topic);
-
-										for (int k = 0; k < topics_size; k++) {
-											if (strcmp(topics[k].name, topic) == 0) {
-												clients[j].last_msg_idx[len] = topics[k].messages_len - 1;
-											}
-										}
-										// clients[j].last_msg_idx = ;
+										// se va retine indexul ultimului mesaj primit inainte de deconectare
+										clients[j].last_msg_idx[len] = 0;
 										clients[j].topics_len++;
 									}
 								}
 							}
+						} else {
+							char *topic = strtok(NULL, " ");
+
+							for (int j = 0; j < num_clients_tcp; j++) {
+								// am gasit clientul care a trimis mesajul
+								if (poll_fds[i].fd == clients[j].sockfd) {
+									int idx = 0;
+
+									// caut indexul la care se se afla topicul
+									for (idx = 0; idx < clients[j].topics_len; idx++) {
+										if (strcmp(clients[j].topics_name[idx], topic) == 0) {
+											break;
+										}
+									}
+
+									// sterg topicul impreuna cu indexul sau
+									for (int k = idx; k < clients[j].topics_len - 1; k++) {
+										strcpy(clients[j].topics_name[k], clients[j].topics_name[k + 1]);
+										clients[j].last_msg_idx[k] = clients[j].last_msg_idx[k + 1];
+									}
+
+									clients[j].topics_len--;
+								}
+							}
 						}
 					}
+
+					// am rezolvat unul dintre evenimente
 					nr_of_events--;
 				}
 			}
@@ -282,8 +293,7 @@ void run_chat_multi_server(int listenfd_tcp, int listenfd_udp) {
 
 	int main(int argc, char *argv[]) {
 	if (argc != 2) {
-		// printf("\n Usage: %s <port>\n", argv[1]);
-		return 1;
+		return -1;
 	}
 
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
