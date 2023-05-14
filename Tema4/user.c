@@ -17,7 +17,7 @@ const char* user_register_login(char *host, int port, char *payload_type, char *
     json_object_set_string(json, "password", password);
     char *payload = json_serialize_to_string_pretty(value);
 
-    char* message = compute_post_request(host, access_route, payload_type, payload, NULL, 0);
+    char* message = compute_post_request(host, access_route, payload_type, payload, NULL, 0, NULL);
 
     send_to_server(sockfd, message);
     char *response = receive_from_server(sockfd);
