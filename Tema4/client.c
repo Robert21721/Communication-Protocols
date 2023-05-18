@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     char **cookies;
     int cookies_len = 0;
     const char *response;
-    char *tocken_jwt = NULL;
+    char *token_jwt = NULL;
 
     cookies = malloc(N * sizeof(char*));
     for (int i = 0; i < N; i++) {
@@ -63,9 +63,9 @@ int main(int argc, char *argv[]) {
             JSON_Value *val_ret = json_parse_string(response);
             JSON_Object *json_ret = json_value_get_object(val_ret);
             if (json_object_get_string(json_ret, "token")) {
-                tocken_jwt = malloc(500 * sizeof(char));
-                strcpy(tocken_jwt, json_object_get_string(json_ret, "token"));
-                printf("%s\n", tocken_jwt);
+                token_jwt = malloc(500 * sizeof(char));
+                strcpy(token_jwt, json_object_get_string(json_ret, "token"));
+                printf("%s\n", token_jwt);
             } else {
                 printf("%s\n", json_object_get_string(json_ret, "error"));
             }
@@ -74,12 +74,13 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(command, "get_books") == 0) {
-            response = get_books(host, port, "/api/v1/tema/library/books", NULL, cookies, cookies_len, tocken_jwt);
+            response = get_books(host, port, "/api/v1/tema/library/books", NULL, cookies, cookies_len, token_jwt);
             printf("%s\n", response);
+            continue;
         }
 
         if (strcmp(command, "get_book") == 0) {
-            response = get_book_info(host, port, "/api/v1/tema/library/books/", NULL, cookies, cookies_len, tocken_jwt);
+            response = get_book_info(host, port, "/api/v1/tema/library/books/", NULL, cookies, cookies_len, token_jwt);
 
             JSON_Value *val_ret = json_parse_string(response);
             JSON_Object *json_ret = json_value_get_object(val_ret);
@@ -93,28 +94,36 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(command, "add_book") == 0) {
-            response = add_book(host, port, payload_type, "/api/v1/tema/library/books", tocken_jwt);
+            response = add_book(host, port, payload_type, "/api/v1/tema/library/books", token_jwt);
             printf("%s\n", response);
 
             continue;
         }
 
         if (strcmp(command, "delete_book") == 0) {
-            response = delete_book(host, port, payload_type, "/api/v1/tema/library/books/", tocken_jwt);
+            response = delete_book(host, port, payload_type, "/api/v1/tema/library/books/", token_jwt);
             printf("%s\n", response);
 
             continue;
         }
 
         if (strcmp(command, "logout") == 0) {
-            cookies_len = 0;
-            free(tocken_jwt);
-            tocken_jwt = NULL;
+            if (is_logged_in(cookies, cookies_len)) {
+                cookies_len = 0;
+                free(token_jwt);
+                token_jwt = NULL;
+            } else {
+                printf("You are not logged in!\n");
+            }
+
+            continue;
         }
 
         if (strcmp(command, "exit") == 0) {
             break;
         }
+
+        printf("Invalid command\n");
     }
 
     return 0;

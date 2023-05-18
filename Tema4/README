@@ -1,0 +1,46 @@
+# Client Web. Comunicaţie cu REST API.
+***
+
+<br/>
+
+## *Scopul lucrarii*
+---
+
+> Comunicarea cu un server prin HTTP
+
+<br/>
+
+## *Modalitate de implementare*
+---
+> Main-ul se afla in fisierul client.c si are rolul de a interpreta comenzile oferite de utilizator si de a apela functii specifice fiecarui task.
+In fisierul user.c se afla o functie ce are rolul de a *autentifica/ creea* un nou user.
+In fisierul library.c se afla functiile prin care userul poate interactiona cu biblioteca.
+
+**!!! Restul scheletului este din laboratorul 9 !!!**
+
+<br/>
+
+### **User**
+---
+> Primele comenzi ce definesc interactiunea cu un user sunt cele de login, register si logout.
+
+* In cazul in care clientul este deja autentificat, comenzile de login si register nu vor functiona.
+In cazul in care clientul nu este logat, acesta nu va putea face logout.
+
+    - Atat pentru **login** cat si pentru **register** se va apela aceeasi functie care are rolul de a citi datele introduse de utilizator si creea o cerere de tipul post catre server. Functia va intoarce un mesaj care poate fi unul de **eroare/ succes**. Daca utilizatorul face login, se va afsa la consola cookie-ul de sesiune.
+
+
+### **Library**
+> Dupa autentificare, userul trebuie sa "intre" in biblioteca prin comanda *enter_library*.
+* Aceasta comanda va apela functia *get_access* care va creea o cerere de tip get, aceasta fiind trimisa catre server. Functia va intoarce un string in format json ce va fi parsat in main. Se va afisa token-ul in caz de succes sau un mesaj de eroare.
+
+* Dupa ce userul a primit acces la bibliotea, acesta poate sa vada cartile existente (prin functiile get_books si get_book_info care vor trimite o cerere de tip get catre server) sau sa adauge/ stearga carti din biblioteca (prin functiile add_book sau delete_book care trimit o cerere de tipul post/ delete catre server).
+
+
+<br/>
+
+
+**!!! TOATE CERINTELE AU FOST REZOLVATE !!!**
+
+**!!! PENTRU PARSAREA DE JSON AM FOLOSIT BIBLIOTECA DIN ENUNT!!!**
+

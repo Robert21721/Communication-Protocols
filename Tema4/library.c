@@ -5,22 +5,20 @@ const char *get_access(char *host, int port, char *url,char *query_params, char 
     DIE(sockfd < 0, "connection");
 
     char *message = compute_get_request(host, url, NULL, cookies, cookies_len, NULL);
-    // puts(message);
+
     
     send_to_server(sockfd, message);
     char *response = receive_from_server(sockfd);
     close_connection(sockfd);
 
-    // puts(response);
-
     return basic_extract_json_response(response);
 }
 
-const char* get_books(char *host, int port, char *url, char *query_params, char **cookies, int cookies_len, char *tocken_jwt) {
+const char* get_books(char *host, int port, char *url, char *query_params, char **cookies, int cookies_len, char *token_jwt) {
     int sockfd = open_connection(host, port, AF_INET, SOCK_STREAM, 0);
     DIE(sockfd < 0, "connection");
 
-    char *message = compute_get_request(host, url, NULL, cookies, cookies_len, tocken_jwt);
+    char *message = compute_get_request(host, url, NULL, cookies, cookies_len, token_jwt);
 
     send_to_server(sockfd, message);
     char *response = receive_from_server(sockfd);
@@ -36,7 +34,7 @@ const char* get_books(char *host, int port, char *url, char *query_params, char 
     }
 }
 
-const char* get_book_info(char *host, int port, char *url, char *query_params, char **cookies, int cookies_len, char *tocken_jwt) {
+const char* get_book_info(char *host, int port, char *url, char *query_params, char **cookies, int cookies_len, char *token_jwt) {
     int sockfd = open_connection(host, port, AF_INET, SOCK_STREAM, 0);
     DIE(sockfd < 0, "connection");
 
@@ -47,7 +45,7 @@ const char* get_book_info(char *host, int port, char *url, char *query_params, c
     strcpy(new_url, url);
     strcat(new_url, id);
 
-    char *message = compute_get_request(host, new_url, NULL, cookies, cookies_len, tocken_jwt);
+    char *message = compute_get_request(host, new_url, NULL, cookies, cookies_len, token_jwt);
 
     send_to_server(sockfd, message);
     char *response = receive_from_server(sockfd);
@@ -56,7 +54,7 @@ const char* get_book_info(char *host, int port, char *url, char *query_params, c
     return basic_extract_json_response(response);
 }
 
-const char *add_book(char *host, int port, char *payload_type, char *url, char *tocken_jwt) {
+const char *add_book(char *host, int port, char *payload_type, char *url, char *token_jwt) {
     int sockfd = open_connection(host, port, AF_INET, SOCK_STREAM, 0);
     DIE(sockfd < 0, "connection");
 
@@ -81,10 +79,24 @@ const char *add_book(char *host, int port, char *payload_type, char *url, char *
     printf("publisher = ");
     fgets(publisher, 20, stdin);
 
-    printf("page_count = ");
-    fgets(page_count, 10, stdin);
+    while (1) {
+        int ok = 1;
+        
+        printf("page_count = ");
+        fgets(page_count, 10, stdin);
 
-    printf("am citit: %s %s %s %s %s", title, author, genre, publisher, page_count);
+        for (int i = 0 ; i < strlen(page_count) - 1; i++) {
+            if (page_count[i] < '0' || page_count[i] > '9') {
+                printf("Page count not valid!\n");
+                ok = 0;
+                break;
+            }
+        }
+
+        if (ok == 1) {
+            break;
+        }
+    }
     
     JSON_Value *value = json_value_init_object();
     JSON_Object *json = json_value_get_object(value);
@@ -96,7 +108,7 @@ const char *add_book(char *host, int port, char *payload_type, char *url, char *
 
     char *payload = json_serialize_to_string_pretty(value);
 
-    char* message = compute_post_request(host, url, payload_type, payload, NULL, 0, tocken_jwt);
+    char* message = compute_post_request(host, url, payload_type, payload, NULL, 0, token_jwt);
 
     send_to_server(sockfd, message);
     char *response = receive_from_server(sockfd);
@@ -114,7 +126,7 @@ const char *add_book(char *host, int port, char *payload_type, char *url, char *
 
 }
 
-const char* delete_book(char *host, int port, char *payload_type, char *url, char *tocken_jwt) {
+const char* delete_book(char *host, int port, char *payload_type, char *url, char *token_jwt) {
     int sockfd = open_connection(host, port, AF_INET, SOCK_STREAM, 0);
     DIE(sockfd < 0, "connection");
 
@@ -126,7 +138,7 @@ const char* delete_book(char *host, int port, char *payload_type, char *url, cha
     strcpy(new_url, url);
     strcat(new_url, id);
 
-    char* message = compute_delete_request(host, new_url, payload_type, tocken_jwt);
+    char* message = compute_delete_request(host, new_url, payload_type, token_jwt);
 
     send_to_server(sockfd, message);
     char *response = receive_from_server(sockfd);
