@@ -154,3 +154,35 @@ const char* delete_book(char *host, int port, char *payload_type, char *url, cha
     JSON_Object *json_ret = json_value_get_object(val_ret);
     return json_object_get_string(json_ret, "error");
 }
+
+void print_books(const char *response) {
+  JSON_Value* values = json_parse_string(response);
+  JSON_Array* array = json_value_get_array(values);
+
+  for (int i = 0; i < json_array_get_count(array); i++) {
+
+      JSON_Object* json = json_array_get_object(array, i);
+      int id = json_object_get_number(json, "id");
+      const char *title = json_object_get_string(json, "title");
+      printf("id: %d\ntitle: %s\n", id, title);
+  }
+}
+
+void print_book(const char *response) {
+    JSON_Value* val = json_parse_string(response);
+    JSON_Object *json = json_value_get_object(val);
+
+    int id = json_object_get_number(json, "id");
+    const char *title = json_object_get_string(json, "title");
+    const char *author = json_object_get_string(json, "author");
+    const char *publisher = json_object_get_string(json, "publisher");
+    const char *genre = json_object_get_string(json, "genre");
+    int page_count = json_object_get_number(json, "page_count");
+
+    printf("id: %d", id);
+    printf("title: %s", title);
+    printf("author: %s", author);
+    printf("publisher: %s", publisher);
+    printf("genre: %s", genre);
+    printf("page_count: %d\n\n", page_count);
+}

@@ -75,7 +75,8 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(command, "get_books") == 0) {
             response = get_books(host, port, "/api/v1/tema/library/books", NULL, cookies, cookies_len, token_jwt);
-            printf("%s\n", response);
+            print_books(response);
+
             continue;
         }
 
@@ -87,7 +88,7 @@ int main(int argc, char *argv[]) {
             if (json_object_get_string(json_ret, "error")) {
                 printf("%s\n", json_object_get_string(json_ret, "error"));
             } else {
-                printf("%s\n", response);
+                print_book(response);
             }
 
             continue;

@@ -34,7 +34,9 @@ In cazul in care clientul nu este logat, acesta nu va putea face logout.
 > Dupa autentificare, userul trebuie sa "intre" in biblioteca prin comanda *enter_library*.
 * Aceasta comanda va apela functia *get_access* care va creea o cerere de tip get, aceasta fiind trimisa catre server. Functia va intoarce un string in format json ce va fi parsat in main. Se va afisa token-ul in caz de succes sau un mesaj de eroare.
 
-* Dupa ce userul a primit acces la bibliotea, acesta poate sa vada cartile existente (prin functiile get_books si get_book_info care vor trimite o cerere de tip get catre server) sau sa adauge/ stearga carti din biblioteca (prin functiile add_book sau delete_book care trimit o cerere de tipul post/ delete catre server).
+* Dupa ce userul a primit acces la bibliotea, acesta poate sa vada cartile existente (prin functiile get_books si get_book_info care vor trimite o cerere de tip get catre server) sau sa adauge/ stearga carti din biblioteca (prin functiile add_book sau delete_book care trimit o cerere de tipul post/ delete catre server). 
+
+* Afisarea cartilor a fost facuta folosind functiile *print_book* si *print_books*
 
 
 <br/>
